@@ -138,7 +138,7 @@ class Platformer extends Phaser.Scene {
 
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
             if (player.body.blocked.down || this.jumpCount < 1) {
-                player.setVelocityY(this.jumpCount === 0 ? -600 : -300);
+                player.setVelocityY(this.jumpCount === 0 ? -450 : -450);
                 this.jumpSound.play();
                 this.jumpCount++;
             }
