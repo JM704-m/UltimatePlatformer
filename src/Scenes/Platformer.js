@@ -32,6 +32,18 @@ class Platformer extends Phaser.Scene {
         my.sprite.player.setCollideWorldBounds(true);
         this.physics.add.collider(my.sprite.player, this.platformLayer);
 
+        // Refined movement vfx (even smaller)
+        this.vfx = {};
+        this.vfx.walking = this.add.particles(0, 0, "kenny-particles", {
+            frame: ["smoke_08.png", "smoke_09.png"],
+            scale: { start: 0.08, end: 0.03 },
+            lifespan: 200,
+            quantity: 2,
+            gravityY: -300,
+            alpha: { start: 0.7, end: 0.1 },
+        });
+        this.vfx.walking.stop();
+
         this.coinObjects = this.map.createFromObjects("CoinObject", { name: "coin", key: "tilemap_sheet", frame: 151 });
         this.heartObjects = this.map.createFromObjects("HeartObject", { name: "heart", key: "tilemap_sheet", frame: 44 });
         this.keyObjects = this.map.createFromObjects("KeyObject", { name: "key", key: "tilemap_sheet", frame: 27 });
@@ -81,7 +93,7 @@ class Platformer extends Phaser.Scene {
 
         this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
         this.cameras.main.startFollow(my.sprite.player);
-        this.cameras.main.setZoom(this.SCALE);
+        this.cameras.main.setZoom(1.8); // Zoomed out slightly
 
         this.scoreText = this.add.text(10, 10, "Score: 0", { fontSize: '16px', fill: '#fff' }).setScrollFactor(0);
         this.healthText = this.add.text(10, 30, "Health: 3", { fontSize: '16px', fill: '#fff' }).setScrollFactor(0);
@@ -129,11 +141,18 @@ class Platformer extends Phaser.Scene {
         if (this.keyA.isDown) {
             player.setVelocityX(-200);
             player.setFlipX(false);
+            this.vfx.walking.startFollow(player, player.displayWidth / 2 - 10, player.displayHeight / 2, false);
+            this.vfx.walking.setParticleSpeed(80, 0);
+            if (player.body.blocked.down) this.vfx.walking.start();
         } else if (this.keyD.isDown) {
             player.setVelocityX(200);
             player.setFlipX(true);
+            this.vfx.walking.startFollow(player, player.displayWidth / 2 - 10, player.displayHeight / 2, false);
+            this.vfx.walking.setParticleSpeed(80, 0);
+            if (player.body.blocked.down) this.vfx.walking.start();
         } else {
             player.setVelocityX(0);
+            this.vfx.walking.stop();
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
