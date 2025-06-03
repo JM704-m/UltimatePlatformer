@@ -13,6 +13,7 @@ class Platformer extends Phaser.Scene {
         this.health = 3;
         this.hasKey = false;
         this.lastSpikeHit = 0;
+        this.gameEnded = false; 
     }
 
     create() {
@@ -32,7 +33,6 @@ class Platformer extends Phaser.Scene {
         my.sprite.player.setCollideWorldBounds(true);
         this.physics.add.collider(my.sprite.player, this.platformLayer);
 
-        // Refined movement vfx (even smaller)
         this.vfx = {};
         this.vfx.walking = this.add.particles(0, 0, "kenny-particles", {
             frame: ["smoke_08.png", "smoke_09.png"],
@@ -87,18 +87,22 @@ class Platformer extends Phaser.Scene {
         });
         this.physics.add.overlap(my.sprite.player, this.doorGroup, () => {
             if (this.hasKey && Phaser.Input.Keyboard.JustDown(this.keyE)) {
-                this.nextLevel();
+                this.gameWin(); 
             }
         });
 
         this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
         this.cameras.main.startFollow(my.sprite.player);
-        this.cameras.main.setZoom(1.8); // Zoomed out slightly
+        this.cameras.main.setZoom(1.8);
 
         this.scoreText = this.add.text(10, 10, "Score: 0", { fontSize: '16px', fill: '#fff' }).setScrollFactor(0);
         this.healthText = this.add.text(10, 30, "Health: 3", { fontSize: '16px', fill: '#fff' }).setScrollFactor(0);
 
-        this.replayButton = this.add.text(this.scale.width / 2, this.scale.height / 2, 'REPLAY', {
+        this.endText = this.add.text(this.scale.width / 2, this.scale.height / 2 - 50, "", {
+            fontSize: '32px', fill: '#fff', backgroundColor: '#000'
+        }).setOrigin(0.5).setScrollFactor(0).setVisible(false);
+
+        this.replayButton = this.add.text(this.scale.width / 2, this.scale.height / 2 + 20, 'REPLAY', {
             fontSize: '32px', fill: '#fff', backgroundColor: '#000'
         }).setOrigin(0.5).setScrollFactor(0).setInteractive().setVisible(false);
 
@@ -123,17 +127,26 @@ class Platformer extends Phaser.Scene {
         if (this.health <= 0) this.gameOver();
     }
 
-    nextLevel() {
-        console.log("Entering next level...");
+    gameWin() {
+        this.endGame("You Win!\nClick REPLAY to restart.");
     }
 
     gameOver() {
+        this.endGame("Game Over\nClick REPLAY to restart.");
+    }
+
+    endGame(message) {
+        if (this.gameEnded) return;
+        this.gameEnded = true;
         my.sprite.player.setActive(false).setVisible(false);
         this.physics.pause();
+        this.endText.setText(message).setVisible(true);
         this.replayButton.setVisible(true);
     }
 
     update() {
+        if (this.gameEnded) return;
+
         const player = my.sprite.player;
 
         if (!player.active) return;
@@ -157,7 +170,7 @@ class Platformer extends Phaser.Scene {
 
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
             if (player.body.blocked.down || this.jumpCount < 1) {
-                player.setVelocityY(this.jumpCount === 0 ? -450 : -450);
+                player.setVelocityY(-450);
                 this.jumpSound.play();
                 this.jumpCount++;
             }
