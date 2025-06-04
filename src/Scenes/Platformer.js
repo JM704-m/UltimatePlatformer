@@ -13,11 +13,13 @@ class Platformer extends Phaser.Scene {
         this.health = 3;
         this.hasKey = false;
         this.lastSpikeHit = 0;
-        this.gameEnded = false; 
+        this.gameEnded = false;
+        this.isFootstepPlaying = false; 
     }
 
     create() {
         this.jumpSound = this.sound.add("jumpSound");
+        this.footstepSound = this.sound.add("footstep", { loop: true, volume: 0.5 }); 
 
         this.map = this.make.tilemap({ key: "platformer-level-1" });
         const tileset1 = this.map.addTilesetImage("tilemap_packed", "tilemap_packed");
@@ -44,6 +46,25 @@ class Platformer extends Phaser.Scene {
         });
         this.vfx.walking.stop();
 
+        this.vfx.jump = this.add.particles(0, 0, "kenny-particles", {
+            frame: ["spark_05.png", "spark_07.png"],
+            scale: { start: 0.1, end: 0.01 },
+            lifespan: 200,
+            quantity: 10,
+            alpha: { start: 0.8, end: 0 },
+            on: false
+        });
+
+        this.vfx.coin = this.add.particles(0, 0, "kenny-particles", {
+            frame: ["sparkle_05.png"],
+            scale: { start: 0.12, end: 0.01 },
+            lifespan: 350,
+            quantity: 10,
+            alpha: { start: 0.9, end: 0 },
+            on: false
+        });
+
+
         this.coinObjects = this.map.createFromObjects("CoinObject", { name: "coin", key: "tilemap_sheet", frame: 151 });
         this.heartObjects = this.map.createFromObjects("HeartObject", { name: "heart", key: "tilemap_sheet", frame: 44 });
         this.keyObjects = this.map.createFromObjects("KeyObject", { name: "key", key: "tilemap_sheet", frame: 27 });
@@ -64,9 +85,11 @@ class Platformer extends Phaser.Scene {
         this.diamondGroup = this.add.group(this.diamondObjects);
 
         this.physics.add.overlap(my.sprite.player, this.coinGroup, (player, coin) => {
+            this.vfx.coin.emitParticleAt(coin.x, coin.y, 16); 
             coin.destroy();
             this.updateScore(10);
         });
+
         this.physics.add.overlap(my.sprite.player, this.heartGroup, (player, heart) => {
             heart.destroy();
             this.updateHealth(1);
@@ -142,6 +165,7 @@ class Platformer extends Phaser.Scene {
         this.physics.pause();
         this.endText.setText(message).setVisible(true);
         this.replayButton.setVisible(true);
+        this.footstepSound.stop(); 
     }
 
     update() {
@@ -151,21 +175,39 @@ class Platformer extends Phaser.Scene {
 
         if (!player.active) return;
 
+        let isWalking = false;
+
         if (this.keyA.isDown) {
             player.setVelocityX(-200);
             player.setFlipX(false);
             this.vfx.walking.startFollow(player, player.displayWidth / 2 - 10, player.displayHeight / 2, false);
             this.vfx.walking.setParticleSpeed(80, 0);
-            if (player.body.blocked.down) this.vfx.walking.start();
+            if (player.body.blocked.down) {
+                this.vfx.walking.start();
+                isWalking = true;
+            }
         } else if (this.keyD.isDown) {
             player.setVelocityX(200);
             player.setFlipX(true);
             this.vfx.walking.startFollow(player, player.displayWidth / 2 - 10, player.displayHeight / 2, false);
             this.vfx.walking.setParticleSpeed(80, 0);
-            if (player.body.blocked.down) this.vfx.walking.start();
+            if (player.body.blocked.down) {
+                this.vfx.walking.start();
+                isWalking = true;
+            }
         } else {
             player.setVelocityX(0);
             this.vfx.walking.stop();
+        }
+
+        if (isWalking && player.body.blocked.down) {
+            if (!this.footstepSound.isPlaying) {
+                this.footstepSound.play();
+            }
+        } else {
+            if (this.footstepSound.isPlaying) {
+                this.footstepSound.stop();
+            }
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
@@ -173,6 +215,7 @@ class Platformer extends Phaser.Scene {
                 player.setVelocityY(-450);
                 this.jumpSound.play();
                 this.jumpCount++;
+                this.vfx.jump.emitParticleAt(player.x, player.y + player.displayHeight / 2, 20);
             }
         }
 

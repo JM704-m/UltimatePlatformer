@@ -14,7 +14,6 @@ class Load extends Phaser.Scene {
         this.load.spritesheet("tilemap_sheet", "tilemap_packed.png", { frameWidth: 18, frameHeight: 18 });
         this.load.image("tilemap_packed", "tilemap_packed.png");
         this.load.image("tilemap_packed_02", "tilemap_packed_02.png");
-        this.load.image("tilemap_packed_03", "tilemap_packed_03.png");
         this.load.image("tilemap_background", "tilemap-backgrounds_packed.png");
 
         // Tilemap
@@ -23,6 +22,7 @@ class Load extends Phaser.Scene {
 
         // Audio
         this.load.audio("jumpSound", "laserSmall_003.ogg");
+        this.load.audio("footstep", "footstep_grass_001.ogg");
     }
 
     create() {
