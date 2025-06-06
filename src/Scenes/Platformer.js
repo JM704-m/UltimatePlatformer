@@ -14,13 +14,14 @@ class Platformer extends Phaser.Scene {
         this.hasKey = false;
         this.lastSpikeHit = 0;
         this.gameEnded = false;
-        this.isFootstepPlaying = false; 
     }
 
     create() {
+        // --- Audio
         this.jumpSound = this.sound.add("jumpSound");
-        this.footstepSound = this.sound.add("footstep", { loop: true, volume: 0.5 }); 
+        this.footstepSound = this.sound.add("footstep", { loop: true, volume: 0.5 });
 
+        // --- Tilemap setup
         this.map = this.make.tilemap({ key: "platformer-level-1" });
         const tileset1 = this.map.addTilesetImage("tilemap_packed", "tilemap_packed");
         const tileset2 = this.map.addTilesetImage("tilemap_packed_02", "tilemap_packed_02");
@@ -35,6 +36,7 @@ class Platformer extends Phaser.Scene {
         my.sprite.player.setCollideWorldBounds(true);
         this.physics.add.collider(my.sprite.player, this.platformLayer);
 
+        // --- VFX
         this.vfx = {};
         this.vfx.walking = this.add.particles(0, 0, "kenny-particles", {
             frame: ["smoke_08.png", "smoke_09.png"],
@@ -42,7 +44,7 @@ class Platformer extends Phaser.Scene {
             lifespan: 200,
             quantity: 2,
             gravityY: -300,
-            alpha: { start: 0.7, end: 0.1 },
+            alpha: { start: 0.7, end: 0.1 }
         });
         this.vfx.walking.stop();
 
@@ -64,17 +66,16 @@ class Platformer extends Phaser.Scene {
             on: false
         });
 
-
+        // --- Objects
         this.coinObjects = this.map.createFromObjects("CoinObject", { name: "coin", key: "tilemap_sheet", frame: 151 });
         this.heartObjects = this.map.createFromObjects("HeartObject", { name: "heart", key: "tilemap_sheet", frame: 44 });
         this.keyObjects = this.map.createFromObjects("KeyObject", { name: "key", key: "tilemap_sheet", frame: 27 });
         this.doorObjects = this.map.createFromObjects("DoorObject", { name: "door", key: "tilemap_sheet", frame: 130 });
         this.spikeObjects = this.map.createFromObjects("SpikesObject", { name: "spikes", key: "tilemap_sheet", frame: 68 });
-        this.diamondObjects = this.map.createFromObjects("DiamondObject", { name: "diamond", key: "tilemap_sheet", frame: 67 });
 
         this.physics.world.enable([
             ...this.coinObjects, ...this.heartObjects, ...this.keyObjects,
-            ...this.doorObjects, ...this.spikeObjects, ...this.diamondObjects
+            ...this.doorObjects, ...this.spikeObjects
         ], Phaser.Physics.Arcade.STATIC_BODY);
 
         this.coinGroup = this.add.group(this.coinObjects);
@@ -82,14 +83,12 @@ class Platformer extends Phaser.Scene {
         this.keyGroup = this.add.group(this.keyObjects);
         this.doorGroup = this.add.group(this.doorObjects);
         this.spikeGroup = this.add.group(this.spikeObjects);
-        this.diamondGroup = this.add.group(this.diamondObjects);
 
         this.physics.add.overlap(my.sprite.player, this.coinGroup, (player, coin) => {
-            this.vfx.coin.emitParticleAt(coin.x, coin.y, 16); 
+            this.vfx.coin.emitParticleAt(coin.x, coin.y, 16);
             coin.destroy();
             this.updateScore(10);
         });
-
         this.physics.add.overlap(my.sprite.player, this.heartGroup, (player, heart) => {
             heart.destroy();
             this.updateHealth(1);
@@ -97,10 +96,6 @@ class Platformer extends Phaser.Scene {
         this.physics.add.overlap(my.sprite.player, this.keyGroup, (player, key) => {
             key.destroy();
             this.hasKey = true;
-        });
-        this.physics.add.overlap(my.sprite.player, this.diamondGroup, (player, diamond) => {
-            diamond.destroy();
-            this.updateScore(50);
         });
         this.physics.add.overlap(my.sprite.player, this.spikeGroup, () => {
             if (this.time.now > this.lastSpikeHit + 1500) {
@@ -110,24 +105,47 @@ class Platformer extends Phaser.Scene {
         });
         this.physics.add.overlap(my.sprite.player, this.doorGroup, () => {
             if (this.hasKey && Phaser.Input.Keyboard.JustDown(this.keyE)) {
-                this.scene.start("platformerScene2");
+                this.scene.start("platformerScene2", { score: this.score });
             }
         });
 
+        // --- Main world camera
         this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
         this.cameras.main.startFollow(my.sprite.player);
         this.cameras.main.setZoom(1.8);
 
-        this.scoreText = this.add.text(10, 10, "Score: 0", { fontSize: '16px', fill: '#fff' }).setScrollFactor(0);
-        this.healthText = this.add.text(10, 30, "Health: 3", { fontSize: '16px', fill: '#fff' }).setScrollFactor(0);
+        // --- UI Camera for HUD only ---
+        this.UICam = this.cameras.add(0, 0, this.sys.game.config.width, this.sys.game.config.height, false, 'UICam');
+        this.UICam.setScroll(0, 0);
 
-        this.endText = this.add.text(this.scale.width / 2, this.scale.height / 2 - 50, "", {
-            fontSize: '32px', fill: '#fff', backgroundColor: '#000'
-        }).setOrigin(0.5).setScrollFactor(0).setVisible(false);
+        // --- HUD (UI elements only) ---
+        this.scoreText = this.add.text(10, 10, "Score: 0", { fontSize: '20px', fill: '#fff', stroke: '#222', strokeThickness: 3 }).setScrollFactor(0).setDepth(1000);
+        this.healthText = this.add.text(10, 36, "Health: 3", { fontSize: '20px', fill: '#fff', stroke: '#222', strokeThickness: 3 }).setScrollFactor(0).setDepth(1000);
 
-        this.replayButton = this.add.text(this.scale.width / 2, this.scale.height / 2 + 20, 'REPLAY', {
+        this.endText = this.add.text(this.sys.game.config.width / 2, this.sys.game.config.height / 2 - 50, "", {
             fontSize: '32px', fill: '#fff', backgroundColor: '#000'
-        }).setOrigin(0.5).setScrollFactor(0).setInteractive().setVisible(false);
+        }).setOrigin(0.5).setScrollFactor(0).setVisible(false).setDepth(2000);
+        this.replayButton = this.add.text(this.sys.game.config.width / 2, this.sys.game.config.height / 2 + 20, 'REPLAY', {
+            fontSize: '32px', fill: '#fff', backgroundColor: '#000'
+        }).setOrigin(0.5).setScrollFactor(0).setInteractive().setVisible(false).setDepth(2000);
+
+        // --- Main camera: ignore only HUD UI ---
+        this.cameras.main.ignore([this.scoreText, this.healthText, this.endText, this.replayButton]);
+
+        // --- UI camera: ignore EVERYTHING except HUD UI ---
+        this.UICam.ignore([
+            my.sprite.player,
+            this.backgroundLayer,
+            this.platformLayer,
+            ...this.coinObjects,
+            ...this.heartObjects,
+            ...this.keyObjects,
+            ...this.doorObjects,
+            ...this.spikeObjects,
+            this.vfx.walking,
+            this.vfx.jump,
+            this.vfx.coin
+        ]);
 
         this.replayButton.on('pointerdown', () => {
             this.scene.restart();
@@ -156,6 +174,7 @@ class Platformer extends Phaser.Scene {
 
     gameOver() {
         this.endGame("Game Over\nClick REPLAY to restart.");
+        this.footstepSound.stop();
     }
 
     endGame(message) {
@@ -165,14 +184,13 @@ class Platformer extends Phaser.Scene {
         this.physics.pause();
         this.endText.setText(message).setVisible(true);
         this.replayButton.setVisible(true);
-        this.footstepSound.stop(); 
+        this.footstepSound.stop();
     }
 
     update() {
         if (this.gameEnded) return;
 
         const player = my.sprite.player;
-
         if (!player.active) return;
 
         let isWalking = false;
@@ -201,13 +219,9 @@ class Platformer extends Phaser.Scene {
         }
 
         if (isWalking && player.body.blocked.down) {
-            if (!this.footstepSound.isPlaying) {
-                this.footstepSound.play();
-            }
+            if (!this.footstepSound.isPlaying) this.footstepSound.play();
         } else {
-            if (this.footstepSound.isPlaying) {
-                this.footstepSound.stop();
-            }
+            if (this.footstepSound.isPlaying) this.footstepSound.stop();
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {

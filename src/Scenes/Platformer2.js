@@ -3,7 +3,7 @@ class Platformer2 extends Phaser.Scene {
         super("platformerScene2");
     }
 
-    init() {
+    init(data) {
         this.SCALE = 2.0;
         this.spawnX = 50;
         this.spawnY = 50;
@@ -11,8 +11,8 @@ class Platformer2 extends Phaser.Scene {
         this.jumpCount = 0;
         this.hasKey = false;
         this.gameEnded = false;
-        this._winState = false;
-        this.isFootstepPlaying = false;
+        this._winState = false; 
+        this.score = data && data.score ? data.score : 0;
     }
 
     create() {
@@ -28,7 +28,6 @@ class Platformer2 extends Phaser.Scene {
         this.backgroundLayer = this.map.createLayer("Background2", backgroundTileset, 0, 0);
         this.platformLayer = this.map.createLayer("Platformer2", [tileset1, tileset2, tileset3], 0, 0);
         this.platformLayer.setCollisionByProperty({ collides: true });
-
         this.waterLayer = this.map.createLayer("Water2", [tileset1, tileset2, tileset3], 0, 0);
 
         const spawnObjLayer = this.map.getObjectLayer("PlayerSpawn2");
@@ -48,7 +47,7 @@ class Platformer2 extends Phaser.Scene {
             lifespan: 200,
             quantity: 2,
             gravityY: -300,
-            alpha: { start: 0.7, end: 0.1 },
+            alpha: { start: 0.7, end: 0.1 }
         });
         this.vfx.walking.stop();
 
@@ -91,6 +90,7 @@ class Platformer2 extends Phaser.Scene {
         this.physics.add.overlap(my.sprite.player, this.coinGroup, (player, coin) => {
             this.vfx.coin.emitParticleAt(coin.x, coin.y, 16);
             coin.destroy();
+            this.updateScore(10);
         });
         this.physics.add.overlap(my.sprite.player, this.keyGroup, (player, key) => { key.destroy(); this.hasKey = true; });
         this.physics.add.overlap(my.sprite.player, this.spikeGroup, () => { this.gameOver(); });
@@ -105,20 +105,40 @@ class Platformer2 extends Phaser.Scene {
         this.cameras.main.startFollow(my.sprite.player);
         this.cameras.main.setZoom(1.8);
 
-        this.endText = this.add.text(this.scale.width / 2, this.scale.height / 2 - 50, "", {
-            fontSize: '32px', fill: '#fff', backgroundColor: '#000'
-        }).setOrigin(0.5).setScrollFactor(0).setVisible(false);
+        // --- UI Camera for HUD only ---
+        this.UICam = this.cameras.add(0, 0, this.sys.game.config.width, this.sys.game.config.height, false, 'UICam');
+        this.UICam.setScroll(0, 0);
 
-        this.replayButton = this.add.text(this.scale.width / 2, this.scale.height / 2 + 20, 'REPLAY', {
+        // --- HUD (UI elements only) ---
+        this.scoreText = this.add.text(10, 10, `Score: ${this.score}`, { fontSize: '20px', fill: '#fff', stroke: '#222', strokeThickness: 3 }).setScrollFactor(0).setDepth(1000);
+
+        this.endText = this.add.text(this.sys.game.config.width / 2, this.sys.game.config.height / 2 - 50, "", {
             fontSize: '32px', fill: '#fff', backgroundColor: '#000'
-        }).setOrigin(0.5).setScrollFactor(0).setInteractive().setVisible(false);
+        }).setOrigin(0.5).setScrollFactor(0).setVisible(false).setDepth(2000);
+        this.replayButton = this.add.text(this.sys.game.config.width / 2, this.sys.game.config.height / 2 + 20, 'REPLAY', {
+            fontSize: '32px', fill: '#fff', backgroundColor: '#000'
+        }).setOrigin(0.5).setScrollFactor(0).setInteractive().setVisible(false).setDepth(2000);
+
+        // --- Main camera: ignore only HUD UI ---
+        this.cameras.main.ignore([this.scoreText, this.endText, this.replayButton]);
+
+        // --- UI camera: ignore EVERYTHING except HUD UI ---
+        this.UICam.ignore([
+            my.sprite.player,
+            this.backgroundLayer,
+            this.platformLayer,
+            this.waterLayer,
+            ...this.coinObjects,
+            ...this.keyObjects,
+            ...this.doorObjects,
+            ...this.spikeObjects,
+            this.vfx.walking,
+            this.vfx.jump,
+            this.vfx.coin
+        ]);
 
         this.replayButton.on('pointerdown', () => {
-            if (this._winState) {
-                this.scene.start("platformerScene");
-            } else {
-                this.scene.restart();
-            }
+            this.scene.start("platformerScene"); // replay brings you back to level 1
         });
 
         this.keyA = this.input.keyboard.addKey('A');
@@ -127,13 +147,18 @@ class Platformer2 extends Phaser.Scene {
         this.keyE = this.input.keyboard.addKey('E');
     }
 
+    updateScore(value) {
+        this.score += value;
+        this.scoreText.setText(`Score: ${this.score}`);
+    }
+
     gameWin() {
         this.endGame("You Win!\nClick REPLAY to restart.", true);
     }
 
     gameOver() {
         this.endGame("Game Over\nClick REPLAY to restart.", false);
-        this.footstepSound.stop(); 
+        this.footstepSound.stop();
     }
 
     endGame(message, win = false) {
@@ -144,7 +169,7 @@ class Platformer2 extends Phaser.Scene {
         this.physics.pause();
         this.endText.setText(message).setVisible(true);
         this.replayButton.setVisible(true);
-        this.footstepSound.stop(); 
+        this.footstepSound.stop();
     }
 
     update() {
@@ -153,6 +178,7 @@ class Platformer2 extends Phaser.Scene {
         const player = my.sprite.player;
         if (!player.active) return;
 
+        // Water death (tile layer)
         let playerFeetY = player.y + player.displayHeight / 2 - 2;
         let tile = this.waterLayer.getTileAtWorldXY(player.x, playerFeetY, true);
 
@@ -187,13 +213,9 @@ class Platformer2 extends Phaser.Scene {
         }
 
         if (isWalking && player.body.blocked.down) {
-            if (!this.footstepSound.isPlaying) {
-                this.footstepSound.play();
-            }
+            if (!this.footstepSound.isPlaying) this.footstepSound.play();
         } else {
-            if (this.footstepSound.isPlaying) {
-                this.footstepSound.stop();
-            }
+            if (this.footstepSound.isPlaying) this.footstepSound.stop();
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
